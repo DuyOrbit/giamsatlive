@@ -1,0 +1,25 @@
+{
+  "name": "app-giam-sat-livestream",
+  "version": "1.0.0",
+  "description": "App desktop giam sat chat luong live TikTok - Bao cao thuc tap CNTT",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "package": "electron-packager . GiamSatLive --platform=win32 --arch=x64 --out=dist --overwrite --prune=true"
+  },
+  "keywords": [
+    "electron",
+    "tiktok",
+    "livestream-monitor"
+  ],
+  "author": "Sinh vien thuc tap",
+  "license": "ISC",
+  "devDependencies": {
+    "electron": "^45.2.3",
+    "electron-packager": "^17.1.2"
+  },
+  "dependencies": {
+    "@tensorflow-models/blazeface": "^0.1.0",
+    "@tensorflow/tfjs": "^4.22.0"
+  }
+}

@@ -1,0 +1,86 @@
+[
+  {
+    "id": "room_loreal",
+    "brand": "L'Oréal Paris Việt Nam",
+    "platform": "TikTok",
+    "url": "https://www.tiktok.com/@lorealparis_vn/live",
+    "active": true
+  },
+  {
+    "id": "room_1794104171717",
+    "brand": "CeraVe Việt Nam",
+    "platform": "TikTok",
+    "url": "https://www.tiktok.com/@cerave.vietnam_official/live",
+    "active": true
+  },
+  {
+    "id": "room_1794104237732",
+    "brand": "3CE VIETNAM",
+    "platform": "TikTok",
+    "url": "https://www.tiktok.com/@3ce_vietnam/live",
+    "active": true
+  },
+  {
+    "id": "room_1794104277620",
+    "brand": "Maybe line",
+    "platform": "TikTok",
+    "url": "https://www.tiktok.com/@maybelline_vn/live",
+    "active": true
+  },
+  {
+    "id": "room_1794104373149",
+    "brand": "La roche posay",
+    "platform": "TikTok",
+    "url": "https://www.tiktok.com/@larocheposayvn/live",
+    "active": true
+  },
+  {
+    "id": "room_1794104412474",
+    "brand": "garnier",
+    "platform": "TikTok",
+    "url": "https://www.tiktok.com/@garnier_vn/live",
+    "active": true
+  },
+  {
+    "id": "room_1794104762288",
+    "brand": "Kiehl",
+    "platform": "TikTok",
+    "url": "https://www.tiktok.com/@kiehlsvietnam/live",
+    "active": true
+  },
+  {
+    "id": "room_1794104787745",
+    "brand": "keratase",
+    "platform": "TikTok",
+    "url": "https://www.tiktok.com/@kerastasevietnam/live",
+    "active": true
+  },
+  {
+    "id": "room_1794104806578",
+    "brand": "drg",
+    "platform": "TikTok",
+    "url": "https://www.tiktok.com/@dr.g_vn_official/live",
+    "active": true
+  },
+  {
+    "id": "room_1794104819462",
+    "brand": "lancome",
+    "platform": "TikTok",
+    "url": "https://www.tiktok.com/@lancome_vietnam/live",
+    "active": true
+  },
+  {
+    "id": "room_1794104834872",
+    "brand": "ysl",
+    "platform": "TikTok",
+    "url": "https://www.tiktok.com/@yslbeauty_vietnam/live",
+    "active": true
+  },
+  {
+    "id": "room_1794104851014",
+    "brand": "vichy",
+    "platform": "TikTok",
+    "url": "https://www.tiktok.com/@vichy.vn/live",
+    "active": true
+  }
+]

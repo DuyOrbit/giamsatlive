@@ -1,0 +1,1101 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Hệ Thống Giám Sát Livestream Bán Hàng Đa Kênh (Multiview Monitor)</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    }
+
+    body {
+      background-color: #0b0c10;
+      color: #e0e6ed;
+      overflow: hidden;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* 1. THANH ĐIỀU HƯỚNG TRÊN CÙNG */
+    .app-header {
+      height: 52px;
+      background-color: #161928;
+      border-bottom: 2px solid #28304c;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 12px;
+      user-select: none;
+      flex-shrink: 0;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .brand-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: #00e5ff;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .live-dot {
+      width: 9px;
+      height: 9px;
+      background-color: #ff3366;
+      border-radius: 50%;
+      display: inline-block;
+      box-shadow: 0 0 8px #ff3366;
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+
+    .stats-badge {
+      background-color: #21263c;
+      padding: 3px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      color: #94a3b8;
+    }
+
+    .stats-badge strong {
+      color: #38ef7d;
+    }
+
+    .lock-scroll-badge {
+      background-color: #1e293b;
+      color: #38bdf8;
+      border: 1px solid #0284c7;
+      padding: 2px 7px;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    button {
+      background-color: #252b45;
+      color: #cbd5e1;
+      border: 1px solid #38426b;
+      padding: 5px 9px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 0.2s ease;
+    }
+
+    button:hover {
+      background-color: #38426b;
+      color: #fff;
+    }
+
+    button.btn-layout {
+      background-color: #312e81;
+      border-color: #4f46e5;
+      color: #c7d2fe;
+    }
+
+    button.btn-layout:hover {
+      background-color: #4338ca;
+      color: #fff;
+    }
+
+    button.btn-success {
+      background-color: #059669;
+      border-color: #047857;
+      color: #fff;
+    }
+
+    button.btn-success:hover {
+      background-color: #10b981;
+    }
+
+    button.btn-primary {
+      background-color: #0066ff;
+      border-color: #0052cc;
+      color: #fff;
+    }
+
+    button.btn-active-audio {
+      background-color: #10b981;
+      border-color: #059669;
+      color: #fff;
+      box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
+    }
+
+    /* 2. THANH NHẬP LIỆU THÊM PHÒNG */
+    .sub-bar-add {
+      background-color: #1f253d;
+      border-bottom: 2px solid #3b82f6;
+      padding: 6px 12px;
+      display: none;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .sub-bar-add input, .sub-bar-add select {
+      background-color: #0f121d;
+      border: 1px solid #3d4a75;
+      color: #fff;
+      padding: 4px 8px;
+      border-radius: 5px;
+      font-size: 11px;
+      outline: none;
+    }
+
+    /* 3. LƯỚI MULTIVIEW CHÍNH */
+    .grid-container {
+      flex: 1;
+      display: grid;
+      position: relative;
+      background-color: #000;
+      gap: 4px;
+      padding: 4px;
+      overflow: hidden;
+    }
+
+    .room-card {
+      background-color: #121522;
+      border: 1px solid #232a42;
+      border-radius: 6px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    .room-card.has-error {
+      border-color: #ef4444;
+      box-shadow: 0 0 8px rgba(239, 68, 68, 0.4);
+    }
+
+    .room-card.has-warning {
+      border-color: #f59e0b;
+      box-shadow: 0 0 8px rgba(245, 158, 11, 0.4);
+    }
+
+    /* ================================================================ */
+    /* THANH TIÊU ĐỀ 2 TẦNG (TWO-TIER ROOM HEADER) */
+    /* Nút ✕ luôn được ghim tuyệt đối ở góc trên bên phải - KHÔNG BAO GIỜ BỊ CHE */
+    /* ================================================================ */
+    .room-header {
+      background-color: #171b2c;
+      border-bottom: 1px solid #27304e;
+      display: flex;
+      flex-direction: column;
+      padding: 4px 6px;
+      z-index: 10;
+      flex-shrink: 0;
+      gap: 3px;
+      position: relative; /* Neo cho nút ✕ cố định */
+      cursor: pointer;
+    }
+
+    .header-row-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-right: 28px; /* Dành khoảng trống cố định 28px cho nút ✕ màu đỏ */
+      gap: 4px;
+    }
+
+    .room-info {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      overflow: hidden;
+      flex: 1;
+      min-width: 0; /* Cho phép co giãn khi ô hẹp */
+    }
+
+    .platform-badge {
+      background-color: #000;
+      color: #fff;
+      font-size: 8px;
+      font-weight: 800;
+      padding: 1px 4px;
+      border-radius: 3px;
+      border: 1px solid #ff0050;
+      letter-spacing: 0.5px;
+      flex-shrink: 0;
+    }
+
+    .platform-shopee {
+      border-color: #ee4d2d;
+      color: #ee4d2d;
+    }
+
+    .brand-name {
+      font-size: 11px;
+      font-weight: 600;
+      color: #f1f5f9;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      flex: 1;
+    }
+
+    .room-controls {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      flex-shrink: 0;
+    }
+
+    .room-controls button {
+      padding: 2px 5px;
+      font-size: 10px;
+    }
+
+    /* NÚT ✕ CỐ ĐỊNH Ở GÓC TRÊN BÊN PHẢI - ĐẢM BẢO 100% LUÔN NHÌN THẤY */
+    button.btn-close-room {
+      position: absolute;
+      right: 4px;
+      top: 4px;
+      background-color: #dc2626;
+      border: 1px solid #b91c1c;
+      color: #ffffff;
+      font-weight: 900;
+      width: 22px;
+      height: 22px;
+      border-radius: 4px;
+      padding: 0;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      z-index: 30;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.6);
+      transition: all 0.15s ease;
+    }
+
+    button.btn-close-room:hover {
+      background-color: #ef4444;
+      transform: scale(1.1);
+    }
+
+    /* Dải nút khôi phục nhanh khi phòng bị lỗi Access Denied hoặc Mất Luồng */
+    .room-recovery-bar {
+      display: none;
+      background-color: #3b0712;
+      border: 1px solid #e11d48;
+      padding: 3px 6px;
+      border-radius: 4px;
+      margin-top: 2px;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 9px;
+      color: #fca5a5;
+    }
+
+    .room-recovery-bar.visible {
+      display: flex;
+    }
+
+    .room-recovery-bar button {
+      padding: 1px 4px;
+      font-size: 9px;
+    }
+
+    /* Tầng 2: Dải đèn LED trạng thái AI */
+    .header-row-bottom {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 2px;
+      overflow: hidden; /* TRIỆT TIÊU HOÀN TOÀN THANH CUỘN NẰM NGANG */
+      scrollbar-width: none; /* Firefox */
+      -ms-overflow-style: none; /* IE/Edge */
+    }
+
+    .header-row-bottom::-webkit-scrollbar {
+      display: none; /* Chrome, Safari, Electron */
+      width: 0px;
+      height: 0px;
+    }
+
+    .status-pill {
+      font-size: 7.5px;
+      padding: 1px 3px;
+      border-radius: 3px;
+      background-color: #1e2438;
+      color: #94a3b8;
+      font-weight: 600;
+      border: 1px solid #2a334e;
+      white-space: nowrap;
+      flex-shrink: 1;
+    }
+
+    .status-pill.good {
+      color: #34d399;
+      border-color: rgba(52, 211, 153, 0.4);
+      background-color: rgba(52, 211, 153, 0.1);
+    }
+
+    .status-pill.error {
+      color: #f87171;
+      border-color: rgba(248, 113, 113, 0.5);
+      background-color: rgba(248, 113, 113, 0.15);
+      animation: blink 1s infinite alternate;
+    }
+
+    .status-pill.warning {
+      color: #fbbf24;
+      border-color: rgba(251, 191, 36, 0.5);
+      background-color: rgba(251, 191, 36, 0.15);
+    }
+
+    @keyframes blink {
+      0% { opacity: 1; }
+      100% { opacity: 0.5; }
+    }
+
+    .video-viewport {
+      flex: 1;
+      background-color: #000;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* 4. BẢNG CẢNH BÁO Ở ĐÁY */
+    .alert-drawer {
+      background-color: #131622;
+      border-top: 2px solid #28304c;
+      display: flex;
+      flex-direction: column;
+      z-index: 100;
+      height: 130px;
+      flex-shrink: 0;
+      transition: height 0.2s ease;
+    }
+
+    .drawer-header {
+      height: 32px;
+      background-color: #181c2d;
+      border-bottom: 1px solid #242a42;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 10px;
+      user-select: none;
+      flex-shrink: 0;
+    }
+
+    .drawer-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #f43f5e;
+    }
+
+    .error-count-badge {
+      background-color: #ef4444;
+      color: white;
+      padding: 1px 6px;
+      border-radius: 10px;
+      font-size: 10px;
+      font-weight: bold;
+    }
+
+    .drawer-latest-msg {
+      font-size: 11px;
+      color: #94a3b8;
+      font-style: italic;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 450px;
+    }
+
+    .drawer-actions {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .drawer-actions button {
+      padding: 2px 6px;
+      font-size: 10px;
+    }
+
+    .table-container {
+      flex: 1;
+      overflow-y: auto;
+      background-color: #0b0d14;
+    }
+
+    .alert-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+      text-align: left;
+    }
+
+    .alert-table th {
+      background-color: #161929;
+      color: #94a3b8;
+      padding: 3px 6px;
+      font-weight: 600;
+      position: sticky;
+      top: 0;
+      border-bottom: 1px solid #232940;
+    }
+
+    .alert-table td {
+      padding: 3px 6px;
+      border-bottom: 1px solid #1a1f33;
+    }
+
+    .alert-table tr:hover {
+      background-color: #16192a;
+    }
+
+    .tag-danger {
+      background-color: rgba(239, 68, 68, 0.2);
+      color: #ef4444;
+      border: 1px solid rgba(239, 68, 68, 0.5);
+      padding: 1px 3px;
+      border-radius: 3px;
+      font-weight: bold;
+      font-size: 9px;
+    }
+
+    .tag-warning {
+      background-color: rgba(245, 158, 11, 0.2);
+      color: #f59e0b;
+      border: 1px solid rgba(245, 158, 11, 0.5);
+      padding: 1px 3px;
+      border-radius: 3px;
+      font-weight: bold;
+      font-size: 9px;
+    }
+
+    #toastNotification {
+      position: fixed;
+      bottom: 140px;
+      right: 20px;
+      background-color: #1e293b;
+      color: #38bdf8;
+      border: 1px solid #38bdf8;
+      padding: 5px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+      display: none;
+      z-index: 999;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 1. THANH TIÊU ĐỀ TRÊN CÙNG -->
+  <header class="app-header">
+    <div class="header-left">
+      <div class="brand-title">
+        <span class="live-dot"></span>
+        GIÁM SÁT LIVESTREAM
+      </div>
+      <div class="stats-badge" id="statsPhong">
+        <strong id="soLuongPhong">0</strong> phòng
+      </div>
+      <div class="lock-scroll-badge">
+        🔒 Đã Khóa Cuộn Chuột (Chống Nhảy Live)
+      </div>
+    </div>
+
+    <div class="header-actions">
+      <!-- Nút đổi bố cục: Chuyển đổi giữa 1x4, 2x6 và 2x2 -->
+      <button id="btnDoiBoCuc" class="btn-layout" title="Bấm để đổi chế độ hiển thị">
+        📐 Bố Cục: 1 Hàng (1x4)
+      </button>
+      <button id="btnToggleThemPhong" class="btn-success">
+        ➕ Thêm Phòng
+      </button>
+      <button id="btnToggleQuanLy" style="background-color: #0284c7; border-color: #0369a1; color: #fff;" title="Quản lý toàn bộ danh sách phòng">
+        📋 Quản Lý (<span id="countQuanLy">0</span>)
+      </button>
+      <button id="btnToggleEco" style="background-color: #065f46; border-color: #059669; color: #a7f3d0;" title="Bật/Tắt chế độ Eco Mode tiết kiệm pin & giảm nóng máy laptop">
+        ⚡ Eco: BẬT
+      </button>
+      <button id="btnMoConfig">
+        ⚙ rooms.json
+      </button>
+      <button id="btnNapLai" class="btn-primary">
+        🔄 Nạp Lại
+      </button>
+    </div>
+  </header>
+
+  <!-- 2. THANH NHẬP LIỆU THÊM PHÒNG -->
+  <div class="sub-bar-add" id="subBarAdd">
+    <span style="font-size: 11px; font-weight: 700; color: #38bdf8;">Dán Link:</span>
+    <input type="text" id="inputBrand" placeholder="Tên Brand" style="width: 140px;">
+    <select id="selectPlatform">
+      <option value="TikTok">TikTok Live</option>
+      <option value="Shopee">Shopee Live</option>
+    </select>
+    <input type="text" id="inputUrl" placeholder="https://www.tiktok.com/@user/live" style="flex: 1;">
+    <button class="btn-success" onclick="xacNhanThemPhongNhanh()">✔ Mở Live</button>
+    <button onclick="dongThanhThemPhong()">✕ Đóng</button>
+  </div>
+
+  <!-- 2B. THANH QUẢN LÝ TẬP TRUNG TẤT CẢ PHÒNG LIVE -->
+  <div class="sub-bar-manage" id="subBarManage" style="display: none; background-color: #15192c; border-bottom: 2px solid #0284c7; padding: 8px 12px; flex-shrink: 0; max-height: 200px; overflow-y: auto;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+      <span style="font-size: 11px; font-weight: 700; color: #38bdf8;">📋 DANH SÁCH TOÀN BỘ PHÒNG ĐANG THEO DÕI (BẤM ✕ ĐỂ BỎ PHÒNG NHANH)</span>
+      <div style="display: flex; gap: 6px;">
+        <button style="background-color: #991b1b; border-color: #ef4444; color: #fff; font-size: 10px; padding: 2px 8px;" onclick="dongTatCaPhong()">
+          🗑 Đóng Tất Cả Phòng
+        </button>
+        <button style="font-size: 10px; padding: 2px 8px;" onclick="dongThanhQuanLy()">
+          ✕ Đóng Menu
+        </button>
+      </div>
+    </div>
+    <div id="danhSachQuanLyList" style="display: flex; flex-direction: column; gap: 4px;"></div>
+  </div>
+
+  <!-- 3. LƯỚI MULTIVIEW -->
+  <main class="grid-container" id="gridContainer"></main>
+
+  <!-- 4. BẢNG CẢNH BÁO Ở ĐÁY -->
+  <footer class="alert-drawer" id="alertDrawer">
+    <div class="drawer-header">
+      <div class="drawer-title">
+        <span>🚨 NHẬT KÝ LỖI (AI GIÁM SÁT HOST CENTER)</span>
+        <span class="error-count-badge" id="badgeTongLoi">0</span>
+      </div>
+
+      <div class="drawer-latest-msg" id="msgMoiNhat">
+        AI đang phân tích vị trí Host Center, độ lệch tâm và ánh sáng...
+      </div>
+
+      <div class="drawer-actions">
+        <button id="btnTaoLoiThu" style="background-color: #4338ca; border-color: #6366f1; color: #fff;">
+          🧪 Thử Lỗi
+        </button>
+        <button id="btnXuatCSV">
+          📥 Xuất CSV
+        </button>
+        <button id="btnXoaLog">
+          🗑 Xóa Log
+        </button>
+        <button id="btnThuGonDrawer">
+          ▼ Thu Gọn
+        </button>
+      </div>
+    </div>
+
+    <div class="table-container">
+      <table class="alert-table">
+        <thead>
+          <tr>
+            <th style="width: 75px;">Thời gian</th>
+            <th style="width: 150px;">Phòng Live</th>
+            <th style="width: 140px;">Loại sự cố</th>
+            <th style="width: 80px;">Mức độ</th>
+            <th>Chi tiết sự cố & Hướng xử lý</th>
+          </tr>
+        </thead>
+        <tbody id="tbodyLoi">
+          <tr id="rowTrong">
+            <td colspan="5" style="text-align: center; color: #64748b; padding: 14px;">
+              Chưa có cảnh báo nào. Mọi phòng live đều đang hoạt động ổn định.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </footer>
+
+  <div id="toastNotification">Thông báo</div>
+
+  <script>
+    const gridContainer = document.getElementById('gridContainer');
+    const soLuongPhongEl = document.getElementById('soLuongPhong');
+    const toastEl = document.getElementById('toastNotification');
+    const alertDrawer = document.getElementById('alertDrawer');
+    const btnThuGon = document.getElementById('btnThuGonDrawer');
+    const badgeTongLoi = document.getElementById('badgeTongLoi');
+    const msgMoiNhat = document.getElementById('msgMoiNhat');
+    const tbodyLoi = document.getElementById('tbodyLoi');
+
+    const btnToggleThemPhong = document.getElementById('btnToggleThemPhong');
+    const subBarAdd = document.getElementById('subBarAdd');
+    const inputBrand = document.getElementById('inputBrand');
+    const selectPlatform = document.getElementById('selectPlatform');
+    const inputUrl = document.getElementById('inputUrl');
+    const btnDoiBoCuc = document.getElementById('btnDoiBoCuc');
+
+    const btnToggleQuanLy = document.getElementById('btnToggleQuanLy');
+    const subBarManage = document.getElementById('subBarManage');
+    const countQuanLy = document.getElementById('countQuanLy');
+    const danhSachQuanLyList = document.getElementById('danhSachQuanLyList');
+
+    const danhSachBoCuc = ['1x4', '2x6', '2x2'];
+    let indexBoCuc = 0; // Mặc định 1x4 (1 hàng 4 ô)
+    let duLieuPhongHienTai = null;
+
+    let toastTimer = null;
+    function hienThongBao(tinNhan) {
+      toastEl.innerText = tinNhan;
+      toastEl.style.display = 'block';
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        toastEl.style.display = 'none';
+      }, 3000);
+    }
+
+    btnDoiBoCuc.addEventListener('click', () => {
+      indexBoCuc = (indexBoCuc + 1) % danhSachBoCuc.length;
+      const bc = danhSachBoCuc[indexBoCuc];
+      btnDoiBoCuc.innerText = bc === '1x4' ? '📐 Bố Cục: 1 Hàng (1x4)' :
+                             bc === '2x6' ? '📐 Bố Cục: 2x6 (12 Ô)' : '📐 Bố Cục: 2x2 (4 Ô)';
+      if (duLieuPhongHienTai) {
+        veDanhSachPhong(duLieuPhongHienTai);
+      }
+      hienThongBao(`Đã chuyển sang ${btnDoiBoCuc.innerText}`);
+    });
+
+    const btnToggleEco = document.getElementById('btnToggleEco');
+    let isEcoMode = true;
+
+    btnToggleEco.addEventListener('click', async () => {
+      isEcoMode = await window.api.chuyenDoiEcoMode();
+      btnToggleEco.innerText = isEcoMode ? '⚡ Eco: BẬT' : '🚀 Hiệu Năng Cao';
+      btnToggleEco.style.backgroundColor = isEcoMode ? '#065f46' : '#4f46e5';
+      btnToggleEco.style.borderColor = isEcoMode ? '#059669' : '#6366f1';
+      btnToggleEco.style.color = isEcoMode ? '#a7f3d0' : '#ffffff';
+      hienThongBao(isEcoMode ? 'Đã BẬT Eco Mode: Quét tuần tra xoay vòng 2.2s để laptop mát máy' : 'Đã chuyển sang chế độ Hiệu Năng Cao (quét 1.4s)');
+    });
+
+    btnToggleQuanLy.addEventListener('click', () => {
+      if (subBarManage.style.display === 'block') {
+        dongThanhQuanLy();
+      } else {
+        subBarManage.style.display = 'block';
+        if (subBarAdd.style.display === 'flex') dongThanhThemPhong();
+        requestAnimationFrame(dongBoToaDoCacViews);
+      }
+    });
+
+    window.dongThanhQuanLy = () => {
+      subBarManage.style.display = 'none';
+      requestAnimationFrame(dongBoToaDoCacViews);
+    };
+
+    window.dongTatCaPhong = () => {
+      if (confirm('Bạn có chắc chắn muốn đóng toàn bộ các phòng live hiện tại không?')) {
+        window.api.dongTatCaPhong();
+        dongThanhQuanLy();
+        hienThongBao('Đã đóng toàn bộ phòng live.');
+      }
+    };
+
+    function capNhatThanhQuanLyPhong(danhSach) {
+      if (!danhSachQuanLyList) return;
+      if (danhSach.length === 0) {
+        danhSachQuanLyList.innerHTML = '<span style="font-size: 11px; color: #64748b; padding: 6px 0;">Hiện không có phòng nào. Hãy bấm ➕ Thêm Phòng để mở live.</span>';
+        return;
+      }
+
+      danhSachQuanLyList.innerHTML = '';
+      danhSach.forEach(p => {
+        const itemRow = document.createElement('div');
+        itemRow.style.cssText = 'display: flex; justify-content: space-between; align-items: center; background: #0b0e1b; padding: 4px 8px; border-radius: 4px; border: 1px solid #232c4a; font-size: 11px;';
+        itemRow.innerHTML = `
+          <div style="display: flex; align-items: center; gap: 8px; overflow: hidden; flex: 1;">
+            <strong style="color: #38bdf8; min-width: 130px;">${p.brand}</strong>
+            <span style="color: #64748b; font-size: 10px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; max-width: 350px;">${p.url}</span>
+          </div>
+          <div style="display: flex; gap: 4px; align-items: center; margin-left: 10px;">
+            <button style="padding: 2px 6px; font-size: 10px;" onclick="taiLaiPhong('${p.id}')">🔄 Tải Lại</button>
+            <button style="padding: 2px 6px; font-size: 10px;" onclick="doiLinkNhanh('${p.id}', '${p.url}')">✏️ Sửa Link</button>
+            <button style="background: #e11d48; color: #fff; border: 1px solid #be123c; border-radius: 3px; padding: 2px 8px; font-size: 10px; font-weight: 700;" onclick="xoaPhong('${p.id}', '${p.brand}')">✕ Bỏ Live</button>
+          </div>
+        `;
+        danhSachQuanLyList.appendChild(itemRow);
+      });
+    }
+
+    function dongBoToaDoCacViews() {
+      const toaDoCacO = [];
+      const cards = document.querySelectorAll('.room-card');
+      cards.forEach(card => {
+        const id = card.id.replace('card-', '');
+        const viewport = card.querySelector('.video-viewport');
+        if (viewport) {
+          const rect = viewport.getBoundingClientRect();
+          toaDoCacO.push({
+            id: id,
+            x: Math.round(rect.left),
+            y: Math.round(rect.top),
+            width: Math.round(rect.width),
+            height: Math.round(rect.height)
+          });
+        }
+      });
+
+      if (toaDoCacO.length > 0) {
+        window.api.dongBoToaDoViews(toaDoCacO);
+      }
+    }
+
+    const ro = new ResizeObserver(() => {
+      requestAnimationFrame(dongBoToaDoCacViews);
+    });
+    ro.observe(gridContainer);
+    window.addEventListener('resize', () => requestAnimationFrame(dongBoToaDoCacViews));
+
+    btnToggleThemPhong.addEventListener('click', () => {
+      if (subBarAdd.style.display === 'flex') {
+        dongThanhThemPhong();
+      } else {
+        subBarAdd.style.display = 'flex';
+        inputBrand.focus();
+        requestAnimationFrame(dongBoToaDoCacViews);
+      }
+    });
+
+    window.dongThanhThemPhong = () => {
+      subBarAdd.style.display = 'none';
+      requestAnimationFrame(dongBoToaDoCacViews);
+    };
+
+    window.xacNhanThemPhongNhanh = () => {
+      const brand = inputBrand.value.trim();
+      const platform = selectPlatform.value;
+      const url = inputUrl.value.trim();
+
+      if (!brand || !url) {
+        alert('Vui lòng nhập Tên Brand và Link Live!');
+        return;
+      }
+
+      window.api.themPhongMoi({ brand, platform, url });
+      inputBrand.value = '';
+      inputUrl.value = '';
+      dongThanhThemPhong();
+      hienThongBao(`Đang mở thêm: ${brand}...`);
+    };
+
+    let dangMoRongDrawer = true;
+    const CHIEU_CAO_MO_RONG = 130;
+    const CHIEU_CAO_THU_GON = 32;
+
+    btnThuGon.addEventListener('click', () => {
+      dangMoRongDrawer = !dangMoRongDrawer;
+      if (dangMoRongDrawer) {
+        alertDrawer.style.height = CHIEU_CAO_MO_RONG + 'px';
+        btnThuGon.innerHTML = '▼ Thu Gọn';
+      } else {
+        alertDrawer.style.height = CHIEU_CAO_THU_GON + 'px';
+        btnThuGon.innerHTML = '▲ Xem Lỗi';
+      }
+      requestAnimationFrame(dongBoToaDoCacViews);
+    });
+
+    const danhSachLoi = [];
+
+    function themCanhBaoVaoBang(item) {
+      danhSachLoi.unshift(item);
+      badgeTongLoi.innerText = danhSachLoi.length;
+      msgMoiNhat.innerHTML = `<strong>[${item.brand}]</strong> ${item.chiTiet}`;
+
+      const rowTrong = document.getElementById('rowTrong');
+      if (rowTrong) rowTrong.remove();
+
+      const tr = document.createElement('tr');
+      const tagClass = item.mucDo === 'danger' ? 'tag-danger' :
+                       item.mucDo === 'warning' ? 'tag-warning' : 'tag-info';
+      const mucDoText = item.mucDo === 'danger' ? 'NGUY HIỂM' :
+                        item.mucDo === 'warning' ? 'CẢNH BÁO' : 'THÔNG TIN';
+
+      tr.innerHTML = `
+        <td style="font-family: monospace; color: #94a3b8;">${item.thoiGian}</td>
+        <td><strong>${item.brand}</strong> <span style="font-size: 10px; color: #64748b;">(${item.platform})</span></td>
+        <td>${item.loaiLoi}</td>
+        <td><span class="${tagClass}">${mucDoText}</span></td>
+        <td>${item.chiTiet}</td>
+      `;
+
+      tbodyLoi.insertBefore(tr, tbodyLoi.firstChild);
+    }
+
+    window.api.onCapNhatChiSoRealtime(({ roomId, chiSo }) => {
+      const card = document.getElementById(`card-${roomId}`);
+      if (!card) return;
+
+      const pCenter = card.querySelector('.pill-center');
+      const pBanner = card.querySelector('.pill-banner');
+      const pFocus = card.querySelector('.pill-focus');
+      const pLight = card.querySelector('.pill-light');
+
+      if (pCenter) {
+        pCenter.className = 'status-pill ' + (chiSo.center || 'good');
+        pCenter.innerText = chiSo.centerText || (chiSo.center === 'warning' ? 'LỆCH TÂM' : 'CENTER: OK');
+      }
+
+      if (pBanner) {
+        pBanner.className = 'status-pill ' + (chiSo.banner || 'good');
+        pBanner.innerText = chiSo.banner === 'warning' ? 'BANNER: ĐỤNG' : 'BANNER: OK';
+      }
+
+      if (pFocus) {
+        pFocus.className = 'status-pill ' + (chiSo.focus || 'good');
+        pFocus.innerText = chiSo.focus === 'error' ? 'LIVE: MẤT' : 
+                           chiSo.focus === 'warning' ? 'NÉT: MỜ' : 'NÉT: TỐT';
+      }
+
+      if (pLight) {
+        pLight.className = 'status-pill ' + (chiSo.light || 'good');
+        pLight.innerText = chiSo.light === 'error' ? 'ĐÈN: TỐI' : 
+                           chiSo.light === 'warning' ? 'ĐÈN: CHÁY' : 'ĐÈN: ĐỦ';
+      }
+
+      const coLoi = Object.values(chiSo).some(v => v === 'error');
+      const coCanhBao = Object.values(chiSo).some(v => v === 'warning');
+      if (coLoi) {
+        card.className = 'room-card has-error';
+      } else if (coCanhBao) {
+        card.className = 'room-card has-warning';
+      } else {
+        card.className = 'room-card';
+      }
+
+      // Hiện dải xử lý nhanh khi có lỗi mất live hoặc Access Denied
+      const recoveryBar = card.querySelector('.room-recovery-bar');
+      if (recoveryBar) {
+        if (chiSo.focus === 'error') {
+          recoveryBar.classList.add('visible');
+        } else {
+          recoveryBar.classList.remove('visible');
+        }
+      }
+    });
+
+    document.getElementById('btnTaoLoiThu').addEventListener('click', () => {
+      const danhSachMau = [
+        {
+          roomId: 'room_loreal',
+          brand: 'L\'Oréal Paris Việt Nam',
+          platform: 'TikTok',
+          loaiLoi: '👤 Host lệch tâm (Off-Center)',
+          mucDo: 'warning',
+          chiTiet: 'Host đang ngồi lệch sang mép trái 21% liên tục hơn 10 giây. Cần nhắc host ngồi về giữa!'
+        },
+        {
+          roomId: 'room_fptshop',
+          brand: 'FPT Shop Official',
+          platform: 'TikTok',
+          loaiLoi: '⚠️ Đầu đụng banner chữ (Top Banner)',
+          mucDo: 'warning',
+          chiTiet: 'Đỉnh đầu host đang chạm vào vùng an toàn 14% phía trên, có nguy cơ bị chữ che mất mặt!'
+        }
+      ];
+
+      const mau = danhSachMau[Math.floor(Math.random() * danhSachMau.length)];
+      themCanhBaoVaoBang({
+        thoiGian: new Date().toLocaleTimeString(),
+        ...mau
+      });
+      hienThongBao('Đã ghi nhận 1 cảnh báo mới.');
+    });
+
+    document.getElementById('btnXuatCSV').addEventListener('click', () => {
+      if (danhSachLoi.length === 0) {
+        hienThongBao('Chưa có cảnh báo nào để xuất file CSV.');
+        return;
+      }
+
+      let csvContent = '\uFEFFThời Gian,Phòng Live,Nền Tảng,Loại Sự Cố,Mức Độ,Chi Tiết\n';
+      danhSachLoi.forEach(l => {
+        csvContent += `"${l.thoiGian}","${l.brand}","${l.platform}","${l.loaiLoi}","${l.mucDo}","${l.chiTiet.replace(/"/g, '""')}"\n`;
+      });
+
+      window.api.xuatFileCSV(csvContent);
+    });
+
+    document.getElementById('btnXoaLog').addEventListener('click', () => {
+      danhSachLoi.length = 0;
+      badgeTongLoi.innerText = '0';
+      msgMoiNhat.innerText = 'Đã xóa toàn bộ nhật ký. Hệ thống tiếp tục giám sát...';
+      tbodyLoi.innerHTML = `
+        <tr id="rowTrong">
+          <td colspan="5" style="text-align: center; color: #64748b; padding: 14px;">
+            Chưa có cảnh báo nào. Mọi phòng live đều đang hoạt động ổn định.
+          </td>
+        </tr>
+      `;
+      hienThongBao('Đã dọn sạch nhật ký lỗi.');
+    });
+
+    document.getElementById('btnMoConfig').addEventListener('click', () => {
+      window.api.moFileConfig();
+      hienThongBao('Đang mở file cấu hình rooms.json...');
+    });
+
+    document.getElementById('btnNapLai').addEventListener('click', () => {
+      window.api.napLaiConfig();
+      hienThongBao('Đang nạp lại danh sách phòng live...');
+    });
+
+    // ================================================================
+    // VẼ GIAO DIỆN LƯỚI MULTIVIEW VỚI HEADER 2 TẦNG
+    // NÚT ✕ LUÔN HIỂN THỊ CỐ ĐỊNH Ở GÓC PHẢI
+    // ================================================================
+    function veDanhSachPhong(data) {
+      duLieuPhongHienTai = data;
+      const { danhSach, phongToId } = data;
+
+      soLuongPhongEl.innerText = danhSach.length;
+      if (countQuanLy) countQuanLy.innerText = danhSach.length;
+      capNhatThanhQuanLyPhong(danhSach);
+
+      if (phongToId) {
+        gridContainer.style.gridTemplateColumns = '1fr';
+        gridContainer.style.gridTemplateRows = '1fr';
+      } else {
+        const bc = danhSachBoCuc[indexBoCuc];
+        if (bc === '2x6') {
+          gridContainer.style.gridTemplateColumns = 'repeat(6, 1fr)';
+          gridContainer.style.gridTemplateRows = 'repeat(2, 1fr)';
+        } else if (bc === '1x4') {
+          gridContainer.style.gridTemplateColumns = `repeat(${Math.max(1, Math.min(4, danhSach.length))}, 1fr)`;
+          gridContainer.style.gridTemplateRows = '1fr';
+        } else {
+          gridContainer.style.gridTemplateColumns = 'repeat(2, 1fr)';
+          gridContainer.style.gridTemplateRows = 'repeat(2, 1fr)';
+        }
+      }
+
+      gridContainer.innerHTML = '';
+
+      const maxHienThi = (danhSachBoCuc[indexBoCuc] === '2x6') ? 12 : 4;
+      const danhSachHienThi = danhSach.slice(0, maxHienThi);
+
+      danhSachHienThi.forEach((phong) => {
+        if (phongToId && phong.id !== phongToId) return;
+
+        const card = document.createElement('div');
+        card.className = 'room-card';
+        card.id = `card-${phong.id}`;
+
+        const isShopee = (phong.platform || '').toLowerCase().includes('shopee');
+        const badgeClass = isShopee ? 'platform-badge platform-shopee' : 'platform-badge';
+
+        // HEADER 2 TẦNG:
+        // NÚT ✕ MÀU ĐỎ CỐ ĐỊNH Ở GÓC TRÊN BÊN PHẢI (position: absolute)
+        // Nhấp đúp chuột vào tiêu đề để Phóng to / Thu nhỏ
+        // Bấm vào tên Brand để Đổi Link nhanh
+        card.innerHTML = `
+          <div class="room-header" ondblclick="chuyenDoiPhongTo('${phong.id}')" title="Nhấp đúp chuột để Phóng to / Thu nhỏ">
+            <!-- NÚT ✕ CỐ ĐỊNH TUYỆT ĐỐI GÓC TRÊN BÊN PHẢI - KHÔNG BAO GIỜ BỊ MẤT DÙ Ô CÓ BỊ CO NHỎ -->
+            <button class="btn-close-room" onclick="event.stopPropagation(); xoaPhong('${phong.id}', '${phong.brand}')" title="Đóng và bỏ phiên live này">
+              ✕
+            </button>
+
+            <!-- TẦNG 1: Tên Brand & Cụm nút điều khiển -->
+            <div class="header-row-top">
+              <div class="room-info" onclick="event.stopPropagation(); doiLinkNhanh('${phong.id}', '${phong.url}')" title="Bấm vào để đổi link live">
+                <span class="${badgeClass}">${phong.platform || 'TIKTOK'}</span>
+                <span class="brand-name" title="${phong.brand}">${phong.brand}</span>
+              </div>
+              <div class="room-controls">
+                <button class="${phong.dangBatTieng ? 'btn-active-audio' : ''}" onclick="event.stopPropagation(); chuyenDoiTieng('${phong.id}')" title="Bật/Tắt tiếng loa">
+                  ${phong.dangBatTieng ? '🔊' : '🔇'}
+                </button>
+                <button onclick="event.stopPropagation(); taiLaiPhong('${phong.id}')" title="Tải lại luồng stream (nếu bị lỗi Access Denied)">
+                  🔄
+                </button>
+                <button onclick="event.stopPropagation(); chuyenDoiPhongTo('${phong.id}')" title="Phóng to / Thu nhỏ">
+                  ${phongToId === phong.id ? '🔙' : '🔍'}
+                </button>
+              </div>
+            </div>
+
+            <!-- TẦNG 2: Dải đèn LED trạng thái AI -->
+            <div class="header-row-bottom">
+              <span class="status-pill good pill-center">CENTER: OK</span>
+              <span class="status-pill good pill-banner">BANNER: OK</span>
+              <span class="status-pill good pill-focus">NÉT: TỐT</span>
+              <span class="status-pill good pill-light">ĐÈN: ĐỦ</span>
+            </div>
+
+            <!-- DẢI XỬ LÝ NHANH KHI BỊ ACCESS DENIED HOẶC MẤT TÍN HIỆU -->
+            <div class="room-recovery-bar" id="recovery-${phong.id}">
+              <span>⚠️ Luồng bị gián đoạn / Access Denied</span>
+              <div style="display: flex; gap: 4px;">
+                <button class="btn-primary" onclick="event.stopPropagation(); taiLaiPhong('${phong.id}')" title="Thử kết nối lại">🔄 Tải lại</button>
+                <button style="background-color: #be123c; color: #fff; border: 1px solid #9f1239; border-radius: 3px; font-size: 9px; padding: 1px 6px;" onclick="event.stopPropagation(); xoaPhong('${phong.id}', '${phong.brand}')" title="Bỏ live">✕ Bỏ</button>
+              </div>
+            </div>
+          </div>
+          <div class="video-viewport" id="viewport-${phong.id}"></div>
+        `;
+
+        gridContainer.appendChild(card);
+      });
+
+      setTimeout(dongBoToaDoCacViews, 60);
+    }
+
+    window.chuyenDoiTieng = (roomId) => window.api.chuyenDoiTieng(roomId);
+    window.chuyenDoiPhongTo = (roomId) => window.api.chuyenDoiPhongTo(roomId);
+    window.taiLaiPhong = (roomId) => {
+      window.api.taiLaiPhong(roomId);
+      hienThongBao('Đang tải lại luồng stream...');
+    };
+
+    window.doiLinkNhanh = (roomId, urlHienTai) => {
+      const urlMoi = prompt('Dán link live TikTok mới cho phòng này:', urlHienTai);
+      if (urlMoi && urlMoi.trim() && urlMoi.trim() !== urlHienTai) {
+        window.api.doiLinkPhong(roomId, urlMoi.trim());
+      }
+    };
+
+    window.xoaPhong = (roomId, brand) => {
+      if (confirm(`Bạn có chắc muốn đóng và bỏ phiên live "${brand}" không?`)) {
+        window.api.xoaPhong(roomId);
+      }
+    };
+
+    window.api.onCapNhatDanhSachPhong((data) => veDanhSachPhong(data));
+    window.api.onThongBaoLog((msg) => hienThongBao(msg));
+    window.api.onCanhBaoMoi((data) => themCanhBaoVaoBang(data));
+
+    window.addEventListener('DOMContentLoaded', () => {
+      window.api.layDanhSachPhong().then(data => {
+        if (data) veDanhSachPhong(data);
+      });
+    });
+  </script>
+</body>
+</html>
